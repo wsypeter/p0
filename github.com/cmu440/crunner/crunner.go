@@ -1,7 +1,9 @@
 package main
 
 import (
-    "fmt"
+	"net"
+	// "bufio"
+	"strconv"
 )
 
 const (
@@ -15,5 +17,17 @@ const (
 // read and print out the server's response to standard output. Whether or
 // not you add any code to this file will not affect your grade.
 func main() {
-    fmt.Println("Not implemented.")
+    conn, _ := net.Dial("tcp", ":" + strconv.Itoa(defaultPort))
+
+	for i := 0; i < 100; i++ {
+		message := strconv.Itoa(i) + "\n"
+		conn.Write([]byte(message))
+		// msg, err := bufio.NewReader(conn).ReadString('\n')
+		// if err != nil {
+		// 	println("Reading error:", err.Error())
+		// }
+		// print(string(msg))
+	}
+
+	// select{}
 }
