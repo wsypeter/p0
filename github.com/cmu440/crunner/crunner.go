@@ -2,8 +2,9 @@ package main
 
 import (
 	"net"
-	// "bufio"
+	"bufio"
 	"strconv"
+	"fmt"
 )
 
 const (
@@ -22,12 +23,13 @@ func main() {
 	for i := 0; i < 100; i++ {
 		message := strconv.Itoa(i) + "\n"
 		conn.Write([]byte(message))
-		// msg, err := bufio.NewReader(conn).ReadString('\n')
-		// if err != nil {
-		// 	println("Reading error:", err.Error())
-		// }
-		// print(string(msg))
 	}
+	for {
+		// will listen for message to process ending in newline (\n)
+		message, _ := bufio.NewReader(conn).ReadString('\n')
+		// output message received
+		fmt.Print("Message Received:", string(message))
+	  }
 
 	// select{}
 }

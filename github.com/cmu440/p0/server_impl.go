@@ -4,17 +4,35 @@ package p0
 import (
 	"fmt"
 	"net"
+	"io"
 	// "strconv"
 )
-
+type client struct {
+	name string
+	connection net.Conn
+	messageQueue chan []byte
+}
 type keyValueServer struct {
+	connection chan net.Conn
+	clientN chan int
+	clientList [] *client
+	listener net.Listener
+	deadClient chan *client
+	newMessage chan []byte
+
 		// TODO: implement this!
 }
 
 // New creates and returns (but does not start) a new KeyValueServer.
 func New() KeyValueServer {
     // TODO: implement this!
-    return &keyValueServer{};
+    return &keyValueServer{
+		make (chan net.Conn),
+		make (chan int),
+		make ([] *client, 0),
+		nil,
+		make (chan *client),
+		make (chan []byte)}
 }
 
 func (kvs *keyValueServer) Start(port int) error {
@@ -22,28 +40,79 @@ func (kvs *keyValueServer) Start(port int) error {
 	if err != nil {
 		// handle error
 	}
+	kvs.listener = ln;
+	go acceptRoutine(kvs);
+	go runServer(kvs)
+	return nil	
+}
+
+func acceptRoutine(kvs *keyValueServer){
 	for {
-		conn, err := ln.Accept()
-		if err != nil {
-			fmt.Println(err);
-			// handle error
+		conn, err :=kvs.listener.Accept();
+		fmt.Println(conn)
+		if err == nil {
+			fmt.Println("writing to connect channel")
+			kvs.connection <- conn;
+			fmt.Println(kvs.connection)
 		}
-		go handleRequest(conn);
 	}
 }
-func handleRequest(conn net.Conn) {
+
+func runServer(kvs *keyValueServer) {
+	fmt.Println("in runserver");
+	for {
+		select {
+		case newMessage := <- kvs.newMessage:
+			for _, v := range kvs.clientList {
+				v.messageQueue <- newMessage
+			}
+		case newConn := <-kvs.connection:
+			fmt.Println("new connection")
+			c := &client{
+				"testclient",
+				newConn,
+				make(chan []byte) }
+			kvs.clientList = append(kvs.clientList, c)
+			go readRoutine(kvs, c)
+			go writeRoutine( c)
+
+		case deadClient := <-kvs.deadClient:
+			for i, c := range kvs.clientList {
+				if c == deadClient {
+					fmt.Println("removing dead")
+					kvs.clientList =
+						append(kvs.clientList[:i], kvs.clientList[i+1:]...)
+					break
+				}
+			}
+		}		
+
+	}
+}
+
+func readRoutine(kvs *keyValueServer, c *client) {
+	
   // Make a buffer to hold incoming data.
-  buf := make([]byte, 1024)
-  // Read the incoming connection into the buffer.
-  _, err := conn.Read(buf)
-  if err != nil {
-    fmt.Println("Error reading:", err.Error())
+  buf := make([]byte, 128)
+  for {
+	_, err := c.connection.Read(buf)
+	if err == io.EOF {
+		kvs.deadClient <- c; 
+	} else{
+		fmt.Println(string(buf));  // Send a response back to person contacting us.
+		kvs.newMessage <- buf;
 	}
-	fmt.Println(string(buf));  // Send a response back to person contacting us.
-  conn.Write([]byte("Message received."))
-  // Close the connection when you're done with it.
-  conn.Close()
+  }
+  // Read the incoming connection into the buffer.
 }
+func writeRoutine (c *client){
+	for {
+		<- c.messageQueue
+		c.connection.Write([]byte("roger\n"))
+	}
+}
+
+
 
 func (kvs *keyValueServer) Close() {
     // TODO: implement this!
