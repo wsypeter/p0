@@ -12,6 +12,11 @@ type client struct {
 	connection net.Conn
 	messageQueue chan []byte
 }
+type db struct {
+	isGet bool
+	key []byte
+	value []byte
+}
 type keyValueServer struct {
 	connection chan net.Conn
 	clientN chan int
@@ -41,6 +46,7 @@ func (kvs *keyValueServer) Start(port int) error {
 		// handle error
 	}
 	kvs.listener = ln;
+	init_db()
 	go acceptRoutine(kvs);
 	go runServer(kvs)
 	return nil	
@@ -85,6 +91,14 @@ func runServer(kvs *keyValueServer) {
 					break
 				}
 			}
+		case query := kvs.queryChan
+			if query.get {
+				v := go get (request.key)
+				kvs.response <- v
+
+			} else {
+				go put (request.key, request.value)
+			}
 		}		
 
 	}
@@ -93,12 +107,31 @@ func runServer(kvs *keyValueServer) {
 func readRoutine(kvs *keyValueServer, c *client) {
 	
   // Make a buffer to hold incoming data.
-  buf := make([]byte, 128)
+  clientReader := bufio.NewReader(c.connection)
   for {
-	_, err := c.connection.Read(buf)
+	message, err := clientReader.ReadBytes('\n')
 	if err == io.EOF {
 		kvs.deadClient <- c; 
-	} else{
+	} else if err != nil {
+		fmt.Println(err)
+		return
+	} else {// processsing
+		buffer := bytes.Split(message, []byte(","))
+		if (string(buffer[0]) == "put") {
+			key := string (buffer[1])
+			value := string (buffer[2])
+			//do db query
+
+		} else{ //read
+			key := string (buffer[1])
+			kvs.queryChan <- &db{
+				isGet: true,
+				key:key,
+			}
+			response := kvs.response
+			kvs.newMessage <- response
+
+		}
 		fmt.Println(string(buf));  // Send a response back to person contacting us.
 		kvs.newMessage <- buf;
 	}
